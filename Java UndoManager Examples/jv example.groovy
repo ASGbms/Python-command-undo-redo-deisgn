@@ -15,19 +15,20 @@ public class UndoTable
 {
     public static void main(String[] args)
     {
-        Object data[][] = {
-            {"AMZN", "Amazon", 41.28, "BUY"},
-            {"EBAY", "eBay", 41.57, "BUY"},
-            {"GOOG", "Google", 388.33, "SELL"},
-            {"MSFT", "Microsoft", 26.56, "SELL"},
-            {"NOK", "Nokia Corp", 17.13, "BUY"},
-            {"ORCL", "Oracle Corp.", 12.52, "BUY"},
-            {"SUNW", "Sun Microsystems", 3.86, "BUY"},
-            {"TWX",  "Time Warner", 17.66, "SELL"},
-            {"VOD",  "Vodafone Group", 26.02, "SELL"},
-            {"YHOO", "Yahoo!", 37.69, "BUY"}
-        };
-        String columns[] = {"Symbol", "Name", "Price", "Guidance"};
+        Object[][] data 
+        data = [
+            ["AMZN", "Amazon", 41.28, "BUY"],
+            ["EBAY", "eBay", 41.57, "BUY"],
+            ["GOOG", "Google", 388.33, "SELL"],
+            ["MSFT", "Microsoft", 26.56, "SELL"],
+            ["NOK", "Nokia Corp", 17.13, "BUY"],
+            ["ORCL", "Oracle Corp.", 12.52, "BUY"],
+            ["SUNW", "Sun Microsystems", 3.86, "BUY"],
+            ["TWX",  "Time Warner", 17.66, "SELL"],
+            ["VOD",  "Vodafone Group", 26.02, "SELL"],
+            ["YHOO", "Yahoo!", 37.69, "BUY"]
+        ];
+        String[] columns = ["Symbol", "Name", "Price", "Guidance"]
 
         final JvUndoableTableModel tableModel = new JvUndoableTableModel(data, columns);
         final JTable table = new JTable(tableModel);
@@ -43,7 +44,7 @@ public class UndoTable
 
 
             public void actionPerformed(ActionEvent e) {
-                tableModel.insertRow(table.getRowCount(), new Object[]{"YHOO", "Yahoo!", 37.69, "BUY"});
+                tableModel.insertRow(table.getRowCount(), ["YHOO", "Yahoo!", 37.69, "BUY"]);
 
 
             }
@@ -94,7 +95,8 @@ class JvUndoableTableModel extends DefaultTableModel
 
     public void setValueAt(Object value, int row, int column, boolean undoable)
     {
-        UndoableEditListener listeners[] = getListeners(UndoableEditListener.class);
+        UndoableEditListener[] listeners 
+        listeners = getListeners(UndoableEditListener.class);
         if (undoable == false || listeners == null)
         {
             super.setValueAt(value, row, column);
@@ -118,8 +120,9 @@ class JvUndoableTableModel extends DefaultTableModel
     }
 
     public void insertRow(int row,
-            Object[] rowData,boolean undoable){
-        UndoableEditListener listeners[] = getListeners(UndoableEditListener.class);
+                          Object[] rowData,boolean undoable){
+        UndoableEditListener[] listeners 
+        listeners = getListeners(UndoableEditListener.class);
         if (undoable == false || listeners == null)
         {
             super.insertRow(row, rowData);
@@ -141,7 +144,8 @@ class JvUndoableTableModel extends DefaultTableModel
         removeRow(row, true);
     }
     public void removeRow(int row, boolean undoable){
-        UndoableEditListener listeners[] = getListeners(UndoableEditListener.class);
+        UndoableEditListener[] listeners 
+        listeners = getListeners(UndoableEditListener.class);
         if (undoable == false || listeners == null)
         {
             super.removeRow(row);
@@ -200,7 +204,7 @@ class JvCellEdit extends AbstractUndoableEdit
 class JvCellNew extends AbstractUndoableEdit
 {
     /**
-     * 
+     *
      */
     private static final long serialVersionUID = 1L;
     protected JvUndoableTableModel tableModel;
@@ -209,14 +213,14 @@ class JvCellNew extends AbstractUndoableEdit
 
     public JvCellNew(JvUndoableTableModel tableModel, Object[] rowData, int row)
     {
-        this.tableModel = tableModel;        
+        this.tableModel = tableModel;
         this.rowData = rowData;
         this.row = row;
 
     }
     public JvCellNew(JvUndoableTableModel tableModel, int row)
     {
-        this.tableModel = tableModel;        
+        this.tableModel = tableModel;
         this.row = row;
 
     }
@@ -243,7 +247,7 @@ class JvCellNew extends AbstractUndoableEdit
 class JvUndoManager extends UndoManager
 {
     protected Action undoAction;
-   // protected Action redoAction;
+    // protected Action redoAction;
 
 
     public JvUndoManager()
