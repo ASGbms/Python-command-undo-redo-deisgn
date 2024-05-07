@@ -15,18 +15,18 @@ public class UndoTable
 {
     public static void main(String[] args)
     {
-        Object[][] data 
+        Object[][] data
         data = [
-            ["AMZN", "Amazon", 41.28, "BUY"],
-            ["EBAY", "eBay", 41.57, "BUY"],
-            ["GOOG", "Google", 388.33, "SELL"],
-            ["MSFT", "Microsoft", 26.56, "SELL"],
-            ["NOK", "Nokia Corp", 17.13, "BUY"],
-            ["ORCL", "Oracle Corp.", 12.52, "BUY"],
-            ["SUNW", "Sun Microsystems", 3.86, "BUY"],
-            ["TWX",  "Time Warner", 17.66, "SELL"],
-            ["VOD",  "Vodafone Group", 26.02, "SELL"],
-            ["YHOO", "Yahoo!", 37.69, "BUY"]
+                ["AMZN", "Amazon", 41.28, "BUY"],
+                ["EBAY", "eBay", 41.57, "BUY"],
+                ["GOOG", "Google", 388.33, "SELL"],
+                ["MSFT", "Microsoft", 26.56, "SELL"],
+                ["NOK", "Nokia Corp", 17.13, "BUY"],
+                ["ORCL", "Oracle Corp.", 12.52, "BUY"],
+                ["SUNW", "Sun Microsystems", 3.86, "BUY"],
+                ["TWX",  "Time Warner", 17.66, "SELL"],
+                ["VOD",  "Vodafone Group", 26.02, "SELL"],
+                ["YHOO", "Yahoo!", 37.69, "BUY"]
         ];
         String[] columns = ["Symbol", "Name", "Price", "Guidance"]
 
@@ -39,14 +39,16 @@ public class UndoTable
 
         JMenu editMenu = new JMenu("Edit");
 
-        Action addrowaction = new AbstractAction("Add Row") {
+        Action addRowAction = new AbstractAction("Add Row") {
             private static final long serialVersionUID = 1433684360133156145L;
-
-
             public void actionPerformed(ActionEvent e) {
                 tableModel.insertRow(table.getRowCount(), ["YHOO", "Yahoo!", 37.69, "BUY"]);
-
-
+            }
+        };
+        Action removeRowAction = new AbstractAction("Remove Row") {
+            private static final long serialVersionUID = 1433684360133156145L;
+            public void actionPerformed(ActionEvent e) {
+                tableModel.removeRows(table.getSelectedRows())
             }
         };
         editMenu.add(undoManager.getUndoAction());
@@ -54,11 +56,12 @@ public class UndoTable
 
         JMenuBar menuBar = new JMenuBar();
         menuBar.add(editMenu);
-        editMenu.add(addrowaction);
+        editMenu.add(addRowAction);
+        editMenu.add(removeRowAction);
 
 
         JFrame frame = new JFrame("Undoable JTable");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         frame.setJMenuBar(menuBar);
         frame.add(pane, BorderLayout.CENTER);
         frame.setSize(300, 150);
@@ -95,9 +98,9 @@ class JvUndoableTableModel extends DefaultTableModel
 
     public void setValueAt(Object value, int row, int column, boolean undoable)
     {
-        UndoableEditListener[] listeners 
+        UndoableEditListener[] listeners
         listeners = getListeners(UndoableEditListener.class);
-        if (undoable == false || listeners == null)
+        if (!undoable || listeners == null)
         {
             super.setValueAt(value, row, column);
             return;
@@ -121,9 +124,9 @@ class JvUndoableTableModel extends DefaultTableModel
 
     public void insertRow(int row,
                           Object[] rowData,boolean undoable){
-        UndoableEditListener[] listeners 
+        UndoableEditListener[] listeners
         listeners = getListeners(UndoableEditListener.class);
-        if (undoable == false || listeners == null)
+        if (!undoable || listeners == null)
         {
             super.insertRow(row, rowData);
             return;
@@ -144,22 +147,55 @@ class JvUndoableTableModel extends DefaultTableModel
         removeRow(row, true);
     }
     public void removeRow(int row, boolean undoable){
-        UndoableEditListener[] listeners 
+        UndoableEditListener[] listeners
         listeners = getListeners(UndoableEditListener.class);
-        if (undoable == false || listeners == null)
+        if (!undoable || listeners == null)
         {
             super.removeRow(row);
             return;
         }
+        Object[] oldRow = getValueAtRow(row)
         super.removeRow(row);
-        JvCellNew cellNew = new JvCellNew(this, row);
-        UndoableEditEvent editEvent = new UndoableEditEvent(this, cellNew);
+        JvCellRemove cellRemove = new JvCellRemove(this, oldRow, row);
+        UndoableEditEvent editEvent = new UndoableEditEvent(this, cellRemove);
         for (UndoableEditListener listener : listeners)
             listener.undoableEditHappened(editEvent);
 
     }
 
+    //removing multiple rows from the table
+    public void removeRows(int[] rows){
+        removeRows(rows, true);
+    }
+    public void removeRows(int[] rows, boolean undoable){
+        UndoableEditListener[] listeners
+        listeners = getListeners(UndoableEditListener.class);
+        if (!undoable || listeners == null)
+        {
+            rows.each {row ->super.removeRow(row)}
+            return;
+        }
+        Object[][] oldRows = getValueAtRows(rows)
+        // here i have all the old data, how do i compound all the edits into one
+        int i = 0
+        rows.each {row ->
+            super.removeRow(row-i)
+            i++
+        }
+        JvCellRemove cellRemove = new JvCellRemove(this, oldRows, rows);
+        UndoableEditEvent editEvent = new UndoableEditEvent(this, cellRemove);
+        for (UndoableEditListener listener : listeners)
+            listener.undoableEditHappened(editEvent);
 
+    }
+
+    public Object[] getValueAtRow(int row){
+        return (0..<getColumnCount()).collect {getValueAt(row,it)}
+    }
+
+    public Object[][] getValueAtRows(int[] rows){
+        return rows.collect {row -> (0..<getColumnCount()).collect { getValueAt(row, it) } }
+    }
     public void addUndoableEditListener(UndoableEditListener listener)
     {
         listenerList.add(UndoableEditListener.class, listener);
@@ -242,7 +278,61 @@ class JvCellNew extends AbstractUndoableEdit
 
     }
 }
+class JvCellRemove extends AbstractUndoableEdit
+{
+    /**
+     *
+     */
+    private static final long serialVersionUID = 1L;
+    protected JvUndoableTableModel tableModel;
+    protected def rowData;
+    protected int[] rows;
+    protected int row;
 
+    public JvCellRemove(JvUndoableTableModel tableModel, Object[][] rowData, int[] rows)
+    {
+        this.tableModel = tableModel
+        this.rowData = rowData
+        this.rows = rows
+
+    }
+    public JvCellRemove(JvUndoableTableModel tableModel, Object[] rowData, int row)
+    {
+        this.tableModel = tableModel
+        this.rowData = rowData
+        this.row = row
+
+    }
+    public JvCellRemove(JvUndoableTableModel tableModel, int row)
+    {
+        this.tableModel = tableModel;
+        this.row = row;
+
+    }
+    @Override
+    public String getPresentationName()
+    {
+        return "Cell Remove"+row;
+    }
+    // Provide a useful toString implementation
+    @Override
+    public String toString()
+    {
+        return getPresentationName();
+    }
+    public void undo() throws CannotUndoException
+    {
+        super.undo();
+        if (rows != null) {
+            (0..<rows.size()).each {index ->
+                tableModel.insertRow(rows[index],rowData[index],false)
+            }
+        } else {tableModel.insertRow(row,rowData,false);}
+
+
+    }
+}
+// add something for row move
 
 class JvUndoManager extends UndoManager
 {
@@ -271,7 +361,7 @@ class JvUndoManager extends UndoManager
         {
             boolean b = super.addEdit(anEdit);
 
-            // Print the current state of this manager 
+            // Print the current state of this manager
             System.out.println("After adding "+anEdit);
             for (UndoableEdit e : this.edits)
             {
@@ -294,7 +384,7 @@ class JvUndoManager extends UndoManager
         {
             super.undoTo(edit);
 
-            // Print the current state of this manager 
+            // Print the current state of this manager
             System.out.println("After undo to "+edit);
             for (UndoableEdit e : this.edits)
             {
