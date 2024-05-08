@@ -42,7 +42,10 @@ public class UndoTable
         Action addRowAction = new AbstractAction("Add Row") {
             private static final long serialVersionUID = 1433684360133156145L;
             public void actionPerformed(ActionEvent e) {
-                tableModel.insertRow(table.getRowCount(), ["YHOO", "Yahoo!", 37.69, "BUY"]);
+                Object[] testRow
+                testRow = ["test","test",123,"SELL"]
+//                tableModel.insertRow(tableModel.getRowCount(), ["test","test",123,"SELL"]) // for some reason declaring an arraylist in here nests it
+                tableModel.insertRow(tableModel.getRowCount(), testRow) // for some reason declaring an arraylist in here nests it
             }
         };
         Action removeRowAction = new AbstractAction("Remove Row") {
@@ -52,7 +55,7 @@ public class UndoTable
             }
         };
         editMenu.add(undoManager.getUndoAction());
-        //editMenu.add(undoManager.getRedoAction());
+        editMenu.add(undoManager.getRedoAction());
 
         JMenuBar menuBar = new JMenuBar();
         menuBar.add(editMenu);
@@ -64,7 +67,7 @@ public class UndoTable
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         frame.setJMenuBar(menuBar);
         frame.add(pane, BorderLayout.CENTER);
-        frame.setSize(300, 150);
+        frame.setSize(300, 550);
         frame.setLocation(200, 300);
         frame.setVisible(true);
     }
@@ -96,11 +99,11 @@ class JvUndoableTableModel extends DefaultTableModel
     }
 
 
-    public void setValueAt(Object value, int row, int column, boolean undoable)
+    public void setValueAt(Object value, int row, int column, boolean newEdit)
     {
         UndoableEditListener[] listeners
         listeners = getListeners(UndoableEditListener.class);
-        if (!undoable || listeners == null)
+        if (!newEdit || listeners == null)
         {
             super.setValueAt(value, row, column);
             return;
@@ -122,11 +125,10 @@ class JvUndoableTableModel extends DefaultTableModel
         insertRow(row, rowData, true);
     }
 
-    public void insertRow(int row,
-                          Object[] rowData,boolean undoable){
+    public void insertRow(int row, Object[] rowData, boolean newEdit){
         UndoableEditListener[] listeners
         listeners = getListeners(UndoableEditListener.class);
-        if (!undoable || listeners == null)
+        if (!newEdit || listeners == null)
         {
             super.insertRow(row, rowData);
             return;
@@ -146,10 +148,10 @@ class JvUndoableTableModel extends DefaultTableModel
     public void removeRow(int row){
         removeRow(row, true);
     }
-    public void removeRow(int row, boolean undoable){
+    public void removeRow(int row, boolean newEdit){
         UndoableEditListener[] listeners
         listeners = getListeners(UndoableEditListener.class);
-        if (!undoable || listeners == null)
+        if (!newEdit || listeners == null)
         {
             super.removeRow(row);
             return;
@@ -165,23 +167,21 @@ class JvUndoableTableModel extends DefaultTableModel
 
     //removing multiple rows from the table
     public void removeRows(int[] rows){
-        removeRows(rows, true);
+        if (rows.size()>0) {removeRows(rows, true)}
     }
-    public void removeRows(int[] rows, boolean undoable){
+    public void removeRows(int[] rows, boolean newEdit){
         UndoableEditListener[] listeners
         listeners = getListeners(UndoableEditListener.class);
-        if (!undoable || listeners == null)
+        if (!newEdit || listeners == null)
         {
-            rows.each {row ->super.removeRow(row)}
+            int i = 0
+            rows.each {row ->super.removeRow(row-i);i++}
             return;
         }
         Object[][] oldRows = getValueAtRows(rows)
         // here i have all the old data, how do i compound all the edits into one
         int i = 0
-        rows.each {row ->
-            super.removeRow(row-i)
-            i++
-        }
+        rows.each {row ->super.removeRow(row-i);i++}
         JvCellRemove cellRemove = new JvCellRemove(this, oldRows, rows);
         UndoableEditEvent editEvent = new UndoableEditEvent(this, cellRemove);
         for (UndoableEditListener listener : listeners)
@@ -196,6 +196,7 @@ class JvUndoableTableModel extends DefaultTableModel
     public Object[][] getValueAtRows(int[] rows){
         return rows.collect {row -> (0..<getColumnCount()).collect { getValueAt(row, it) } }
     }
+
     public void addUndoableEditListener(UndoableEditListener listener)
     {
         listenerList.add(UndoableEditListener.class, listener);
@@ -220,21 +221,22 @@ class JvCellEdit extends AbstractUndoableEdit
         this.row = row;
         this.column = column;
     }
-
-
     @Override
     public String getPresentationName()
     {
         return "Cell Edit";
     }
-
-
     @Override
     public void undo() throws CannotUndoException
     {
         super.undo();
-
         tableModel.setValueAt(oldValue, row, column, false);
+    }
+    @Override
+    public void redo() throws CannotRedoException
+    {
+        super.redo();
+        tableModel.setValueAt(newValue, row, column, false);
     }
 }
 class JvCellNew extends AbstractUndoableEdit
@@ -275,6 +277,12 @@ class JvCellNew extends AbstractUndoableEdit
     {
         super.undo();
         tableModel.removeRow(row,false);
+
+    }
+    public void redo() throws CannotRedoException
+    {
+        super.redo();
+        tableModel.insertRow(row, rowData,false);
 
     }
 }
@@ -327,9 +335,14 @@ class JvCellRemove extends AbstractUndoableEdit
             (0..<rows.size()).each {index ->
                 tableModel.insertRow(rows[index],rowData[index],false)
             }
-        } else {tableModel.insertRow(row,rowData,false);}
-
-
+        } else {tableModel.insertRow(row,rowData,false)}
+    }
+    public void redo() throws CannotRedoException
+    {
+        super.redo();
+        if (rows != null) {
+            tableModel.removeRows(rows,false)
+        } else {tableModel.removeRow(row,false);}
     }
 }
 // add something for row move
@@ -337,19 +350,24 @@ class JvCellRemove extends AbstractUndoableEdit
 class JvUndoManager extends UndoManager
 {
     protected Action undoAction;
-    // protected Action redoAction;
+    protected Action redoAction;
 
 
     public JvUndoManager()
     {
-        this.undoAction = new JvUndoAction(this);
+        this.undoAction = new JvUndoAction(this)
+        this.redoAction = new JvRedoAction(this)
         synchronizeActions();           // to set initial names
     }
 
 
     public Action getUndoAction()
     {
-        return undoAction;
+        return undoAction
+    }
+    public Action getRedoAction()
+    {
+        return redoAction
     }
 
 
@@ -362,7 +380,7 @@ class JvUndoManager extends UndoManager
             boolean b = super.addEdit(anEdit);
 
             // Print the current state of this manager
-            System.out.println("After adding "+anEdit);
+            System.out.println("Edits after adding ${anEdit}:")
             for (UndoableEdit e : this.edits)
             {
                 System.out.println(e);
@@ -385,7 +403,28 @@ class JvUndoManager extends UndoManager
             super.undoTo(edit);
 
             // Print the current state of this manager
-            System.out.println("After undo to "+edit);
+            System.out.println("Edits after undoing ${edit}:")
+            for (UndoableEdit e : this.edits)
+            {
+                System.out.println(e);
+            }
+
+        }
+        finally
+        {
+            synchronizeActions();
+        }
+    }
+
+    @Override
+    protected void redoTo(UndoableEdit edit) throws CannotUndoException
+    {
+        try
+        {
+            super.redoTo(edit);
+
+            // Print the current state of this manager
+            System.out.println("Edits after redoing ${edit}:")
             for (UndoableEdit e : this.edits)
             {
                 System.out.println(e);
@@ -401,8 +440,10 @@ class JvUndoManager extends UndoManager
 
     protected void synchronizeActions()
     {
-        undoAction.setEnabled(canUndo());
-        undoAction.putValue(Action.NAME, getUndoPresentationName());
+        undoAction.setEnabled(canUndo())
+        undoAction.putValue(Action.NAME, getUndoPresentationName())
+        redoAction.setEnabled(canRedo())
+        redoAction.putValue(Action.NAME, getRedoPresentationName())
     }
 }
 
@@ -427,6 +468,29 @@ class JvUndoAction extends AbstractAction
         catch (CannotUndoException ex)
         {
             ex.printStackTrace();
+        }
+    }
+}
+class JvRedoAction extends AbstractAction
+{
+    protected final UndoManager manager;
+
+
+    public JvRedoAction(UndoManager manager)
+    {
+        this.manager = manager
+    }
+
+
+    public void actionPerformed(ActionEvent e)
+    {
+        try
+        {
+            manager.redo()
+        }
+        catch (CannotUndoException ex)
+        {
+            ex.printStackTrace()
         }
     }
 }
